@@ -1,0 +1,40 @@
+{
+  "configurations": [
+      {
+          "name": "Linux",
+          "includePath": [
+              "/usr/include",
+              "/opt/ros/noetic/include",
+              "/usr/include/eigen3",
+              "/usr/include/pcl-1.10",
+              "${workspaceFolder}/src/global_planner/src/occ_grid/include",
+              "${workspaceFolder}/src/global_planner/src/path_finder/include/path_finder",
+              "${workspaceFolder}/src/global_planner/src/path_finder/include/visualization",
+              "${workspaceFolder}/src/global_planner/src/path_finder/include",
+              "${workspaceFolder}/src/global_planner/devel/include",
+              "${workspaceFolder}/src/local_planner/include"
+          ],
+          "defines": [],
+          "compilerPath": "/usr/bin/gcc",
+          "cStandard": "c11",
+          "cppStandard": "gnu++14",
+          "intelliSenseMode": "linux-gcc-x64",
+          "compilerPathInCppPropertiesJson": "/usr/bin/gcc",
+          "mergeConfigurations": false,
+          "browse": {
+              "path": [
+                  "/usr/include",
+                  "/opt/ros/noetic/include",
+                  "/usr/include/eigen3",
+                  "/usr/include/pcl-1.10",
+                  "${workspaceFolder}/src/global_planner/src/occ_grid/include",
+                  "${workspaceFolder}/src/global_planner/src/path_finder/include/path_finder",
+                  "${workspaceFolder}/src/global_planner/src/path_finder/include/visualization",
+                  "${workspaceFolder}"
+              ],
+              "limitSymbolsToIncludedHeaders": true
+          }
+      }
+  ],
+  "version": 4
+}
