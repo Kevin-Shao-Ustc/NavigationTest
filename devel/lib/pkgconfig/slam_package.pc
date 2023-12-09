@@ -1,0 +1,8 @@
+prefix=/home/syy/NavigationTest/devel
+
+Name: slam_package
+Description: Description of slam_package
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

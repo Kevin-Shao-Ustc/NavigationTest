@@ -41,13 +41,38 @@ namespace env
       return;
 
     occupancy_buffer_[idxToAddress(id)] = true;
+
+    // set inflation
+    if (inflation_radius_ > 0)
+    {
+      Eigen::Vector2i id_inflation;
+      Eigen::Vector2d pos_inflation;
+      int inflation_radius_id = ceil(inflation_radius_ * resolution_inv_);
+      for (int x = -inflation_radius_id; x <= inflation_radius_id; ++x)
+        for (int y = -inflation_radius_id; y <= inflation_radius_id; ++y)
+        {
+          id_inflation = id + Eigen::Vector2i(x, y);
+          if (!isInMap(id_inflation))
+            continue;
+          indexToPos(id_inflation, pos_inflation);
+          if ((pos_inflation - pos).norm() <= inflation_radius_)
+            occupancy_buffer_[idxToAddress(id_inflation)] = true;
+        }
+    }
   }
+  // {
+  //   Eigen::Vector2i id;
+  //   posToIndex(pos, id);
+  //   // cout << "id: " << id.transpose() << ", idx: " << idxToAddress(id) << ", is in map? " << isInMap(id) << endl;
+  //   if (!isInMap(id))
+  //     return;
+
+  //   occupancy_buffer_[idxToAddress(id)] = true;
+  // }
 
   void OccMap::globalMapCallback(const nav_msgs::OccupancyGridPtr &msg)
   {
     if (!is_global_map_metadata_valid_)
-      return;
-    if (is_global_map_valid_)
       return;
 
     fill(occupancy_buffer_.begin(), occupancy_buffer_.end(), false);
@@ -106,15 +131,15 @@ namespace env
     cout << "map meta data initialized: " << endl;
   }
 
-  void OccMap::init(const ros::NodeHandle &nh, const std::string &map_topic, const std::string &map_metadata_topic)
+  void OccMap::init(const ros::NodeHandle &nh, const std::string &map_topic, const std::string &map_metadata_topic, const float &inflation_radius)
   {
     node_ = nh;
-
     is_global_map_valid_ = false;
     is_global_map_metadata_valid_ = false;
+    inflation_radius_ = inflation_radius;
 
     global_map_sub_ = node_.subscribe(map_topic, 1, &OccMap::globalMapCallback, this);
-    global_map_metadata_sub_ = node_.subscribe(map_metadata_topic, 1, &OccMap::globalMapCallback, this);
+    global_map_metadata_sub_ = node_.subscribe(map_metadata_topic, 1, &OccMap::globalMapMetadataCallback, this);
     cout << "map initialized: " << endl;
   }
 } // namespace env

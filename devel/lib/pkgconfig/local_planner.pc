@@ -1,0 +1,8 @@
+prefix=/home/syy/NavigationTest/devel
+
+Name: local_planner
+Description: Description of local_planner
+Version: 0.1.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

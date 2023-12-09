@@ -1,0 +1,8 @@
+prefix=/home/syy/NavigationTest/install
+
+Name: all
+Description: Description of all
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

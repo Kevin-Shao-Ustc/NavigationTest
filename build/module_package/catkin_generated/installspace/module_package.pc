@@ -1,0 +1,8 @@
+prefix=/home/syy/NavigationTest/install
+
+Name: module_package
+Description: Description of module_package
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

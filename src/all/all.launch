@@ -1,0 +1,6 @@
+<launch>
+    <include file="$(find module_package)/launch/model.launch"/>
+    <include file="$(find slam_package)/launch/gmapping.launch"/>
+    <include file="$(find path_finder)/launch/global_planner.launch"/>
+    <include file="$(find local_planner)/launch/min_jerk.launch"/>
+</launch>

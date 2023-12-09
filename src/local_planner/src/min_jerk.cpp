@@ -13,7 +13,6 @@
 struct Config
 {
     std::string targetTopic;
-    double clickHeight;
     std::vector<double> initialVel;
     std::vector<double> initialAcc;
     std::vector<double> terminalVel;
@@ -25,7 +24,6 @@ struct Config
     Config(const ros::NodeHandle &nh_priv)
     {
         nh_priv.getParam("TargetTopic", targetTopic);
-        nh_priv.getParam("ClickHeight", clickHeight);
         nh_priv.getParam("InitialVel", initialVel);
         nh_priv.getParam("InitialAcc", initialAcc);
         nh_priv.getParam("TerminalVel", terminalVel);
@@ -278,6 +276,8 @@ public:
         // ++positionNum;
 
         //  get waypoint number, position and time
+        try
+        {    
         positionNum = msg->poses.size();
 
         if (positionNum < 2)
@@ -308,6 +308,7 @@ public:
     
         const int pieceNum = positionNum - 1;
         const Eigen::Vector2d initialPos = positions.col(0);
+        ROS_WARN("HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         const Eigen::Vector2d initialVel(config.initialVel[0], config.initialVel[1]);
         const Eigen::Vector2d initialAcc(config.initialAcc[0], config.initialAcc[1]);
         const Eigen::Vector2d terminalPos = positions.col(pieceNum);
@@ -334,7 +335,13 @@ public:
         }
         
         visualizer.visualize(traj, positions.leftCols(positionNum));
-
+        }
+        catch(const std::exception& e)
+        {
+            // print the error
+            ROS_WARN("Failed to call targetCallBack");
+            std::cerr << e.what() << '\n';
+        }
         return;
     }
 };

@@ -117,15 +117,15 @@ public:
     static int has_calculated_rotation_matrix = 0;
     static Eigen::Vector2d hat_x;
     static Eigen::Vector2d hat_y;
-    if (!has_calculated_rotation_matrix)
-    {
-      hat_x = (p_goal - p_start) / (p_goal - p_start).norm();
-      hat_y = Eigen::Vector2d(-hat_x[1], hat_x[0]);
-      has_calculated_rotation_matrix = 1;
-    }
     // if a path has been found
     if (goal_found)
     {
+      if (!has_calculated_rotation_matrix)
+      {
+        hat_x = (p_goal - p_start) / (p_goal - p_start).norm();
+        hat_y = Eigen::Vector2d(-hat_x[1], hat_x[0]);
+        has_calculated_rotation_matrix = 1;
+      }
       // calculate the params of the ellipsoid
       double a = cost_from_start / 2.0f;
       double c = (p_goal - p_start).norm() / 2.0f;
@@ -153,6 +153,10 @@ public:
         // if not, continue the loop
         sample_count++;
       }
+    }
+    else
+    {
+      has_calculated_rotation_matrix = 0;
     }
     // if no path has been found
     sample[0] = uniform_rand_(gen_);

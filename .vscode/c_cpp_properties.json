@@ -9,9 +9,7 @@
               "/usr/include/pcl-1.10",
               "${workspaceFolder}/src/global_planner/src/occ_grid/include",
               "${workspaceFolder}/src/global_planner/src/path_finder/include/path_finder",
-              "${workspaceFolder}/src/global_planner/src/path_finder/include/visualization",
               "${workspaceFolder}/src/global_planner/src/path_finder/include",
-              "${workspaceFolder}/src/global_planner/devel/include",
               "${workspaceFolder}/src/local_planner/include"
           ],
           "defines": [],
@@ -29,7 +27,6 @@
                   "/usr/include/pcl-1.10",
                   "${workspaceFolder}/src/global_planner/src/occ_grid/include",
                   "${workspaceFolder}/src/global_planner/src/path_finder/include/path_finder",
-                  "${workspaceFolder}/src/global_planner/src/path_finder/include/visualization",
                   "${workspaceFolder}"
               ],
               "limitSymbolsToIncludedHeaders": true

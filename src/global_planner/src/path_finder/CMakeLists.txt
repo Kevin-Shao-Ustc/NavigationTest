@@ -1,16 +1,15 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(path_finder)
 
-add_compile_options(-std=c++11)
+set(CMAKE_CXX_FLAGS "-std=c++14")
 set(CMAKE_BUILD_TYPE "Release")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g -fPIC")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -fPIC")
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
   occ_grid
-  self_msgs_and_srvs
   tf2_ros
   tf2_geometry_msgs
 )
@@ -18,7 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 
 find_package(Eigen3 REQUIRED)
-find_package(PCL 1.7 REQUIRED)
+find_package(PCL 1.10 REQUIRED)
 
 catkin_package(
   INCLUDE_DIRS include

@@ -1,0 +1,17 @@
+map_frame_id: 'map'
+robot_frame_id: 'base_link'
+map_service_name: '/dynamic_map'
+goal_topic: '/move_base_simple/goal'
+map_topic: '/map'
+map_metadata_topic: '/map_metadata'
+path_topic: '/global_path'
+inflation_radius: 0.5
+request_position_x: 0.0
+request_position_y: 0.0
+request_length_x: 100.0
+request_length_y: 100.0
+
+RRT_Star/steer_length: 0.5
+RRT_Star/search_radius: 1.0
+RRT_Star/search_time: 0.1
+RRT_Star/max_tree_node_nums: 10000

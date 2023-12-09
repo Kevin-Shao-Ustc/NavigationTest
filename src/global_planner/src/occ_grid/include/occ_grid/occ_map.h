@@ -44,7 +44,7 @@ namespace env
   public:
     OccMap() {}
     ~OccMap(){};
-    void init(const ros::NodeHandle &nh, const std::string &map_topic, const std::string &map_metadata_topic);
+    void init(const ros::NodeHandle &nh, const std::string &map_topic, const std::string &map_metadata_topic, const float &inflation_radius);
 
     bool mapValid() { return is_global_map_valid_; }
     double getResolution() { return resolution_; }
@@ -120,6 +120,8 @@ namespace env
     pcl::PointCloud<pcl::PointXYZ>::Ptr glb_cloud_ptr_;
     bool is_global_map_valid_;
     bool is_global_map_metadata_valid_;
+
+    float inflation_radius_;
   };
 
   inline int OccMap::idxToAddress(const int &x_id, const int &y_id) const

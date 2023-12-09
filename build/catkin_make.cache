@@ -1,0 +1,2 @@
+all:global_planner/src/occ_grid:global_planner/src/path_finder:local_planner:module_package:slam_package
+-DCATKIN_DEVEL_PREFIX=/home/syy/NavigationTest/devel -DCMAKE_INSTALL_PREFIX=/home/syy/NavigationTest/install -G Unix Makefiles

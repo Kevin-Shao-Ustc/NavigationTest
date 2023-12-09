@@ -1,6 +1,4 @@
-TargetTopic:             '/path_finder_node/rrt_star_final_path'
-
-ClickHeight:             1.5
+TargetTopic:             '/global_path'
 
 InitialVel:              [0.0, 0.0, 0.0]
 

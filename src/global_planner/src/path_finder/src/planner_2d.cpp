@@ -20,7 +20,6 @@ OF SUCH DAMAGE.
 */
 #include "occ_grid/occ_map.h"
 #include "path_finder/rrt_star.h"
-#include "visualization/visualization.hpp"
 
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -89,7 +88,7 @@ public:
     Planner2d(const ros::NodeHandle &nh, const Config &conf) : nh_(nh), config_(conf), tf_buffer(ros::Duration(10)), tf_listener(tf_buffer)
     {
         env_ptr_.reset(new env::OccMap);
-        env_ptr_->init(nh_, conf.map_topic, conf.map_metadata_topic);
+        env_ptr_->init(nh_, conf.map_topic, conf.map_metadata_topic, conf.inflation_radius);
 
         // vis_ptr_ = std::make_shared<visualization::Visualization>(nh_);
 

@@ -22,7 +22,6 @@ OF SUCH DAMAGE.
 #define RRT_STAR_H
 
 #include "occ_grid/occ_map.h"
-#include "visualization/visualization.hpp"
 #include "sampler.h"
 #include "node.h"
 #include "kdtree.h"
@@ -42,16 +41,14 @@ namespace path_plan
     RRTStar(){};
     RRTStar(const ros::NodeHandle &nh, const env::OccMap::Ptr &mapPtr) : nh_(nh), map_ptr_(mapPtr)
     {
-      nh_.param("RRT_Star/steer_length", steer_length_, 0.0);
-      nh_.param("RRT_Star/search_radius", search_radius_, 0.0);
-      nh_.param("RRT_Star/search_time", search_time_, 0.0);
-      nh_.param("RRT_Star/max_tree_node_nums", max_tree_node_nums_, 0);
+      nh_.param("RRT_Star/steer_length", steer_length_, 0.5);
+      nh_.param("RRT_Star/search_radius", search_radius_, 1.0);
+      nh_.param("RRT_Star/search_time", search_time_, 0.1);
+      nh_.param("RRT_Star/max_tree_node_nums", max_tree_node_nums_, 1000);
       ROS_WARN_STREAM("[RRT*] param: steer_length: " << steer_length_);
       ROS_WARN_STREAM("[RRT*] param: search_radius: " << search_radius_);
       ROS_WARN_STREAM("[RRT*] param: search_time: " << search_time_);
       ROS_WARN_STREAM("[RRT*] param: max_tree_node_nums: " << max_tree_node_nums_);
-
-      sampler_.setSamplingRange(mapPtr->getOrigin(), mapPtr->getMapSize());
 
       valid_tree_node_nums_ = 0;
       nodes_pool_.resize(max_tree_node_nums_);
@@ -132,6 +129,8 @@ namespace path_plan
     // environment
     env::OccMap::Ptr map_ptr_;
     // std::shared_ptr<visualization::Visualization> vis_ptr_;
+
+    bool isSamplerValid_ = false;
 
     void reset()
     {
@@ -229,7 +228,16 @@ namespace path_plan
         /* biased random sampling */
         Eigen::Vector2d x_rand;
         /* TODO: modify the sample function for heuristic sampling*/
+        if (this->map_ptr_->mapValid() && !isSamplerValid_)
+        {
+          sampler_.setSamplingRange(map_ptr_->getOrigin(), map_ptr_->getMapSize());
+          isSamplerValid_ = true;
+        }
         sampler_.samplingOnce(x_rand, goal_found, goal_node_->cost_from_start, start_node_->x, goal_node_->x);
+        if (idx % 100 == 0)
+        {
+          // ROS_INFO_STREAM("[RRT*]: " << idx << " nodes added to rrt-tree, " << (ros::Time::now() - rrt_start_time).toSec() << " seconds elapsed");
+        }
         // samplingOnce(x_rand);
         if (!map_ptr_->isStateValid(x_rand))
         {
