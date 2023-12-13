@@ -6,23 +6,3 @@
 
 #IncludeRegexTransform: 
 
-/home/syy/NavigationTest/src/global_planner/src/path_finder/include/path_finder/kdtree.h
-
-/home/syy/NavigationTest/src/global_planner/src/path_finder/src/kdtree.c
-config.h
--
-stdio.h
--
-stdlib.h
--
-string.h
--
-math.h
--
-path_finder/kdtree.h
-/home/syy/NavigationTest/src/global_planner/src/path_finder/src/path_finder/kdtree.h
-malloc.h
--
-pthread.h
--
-

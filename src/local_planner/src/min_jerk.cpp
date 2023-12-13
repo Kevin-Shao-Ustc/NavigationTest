@@ -308,7 +308,6 @@ public:
     
         const int pieceNum = positionNum - 1;
         const Eigen::Vector2d initialPos = positions.col(0);
-        ROS_WARN("HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         const Eigen::Vector2d initialVel(config.initialVel[0], config.initialVel[1]);
         const Eigen::Vector2d initialAcc(config.initialAcc[0], config.initialAcc[1]);
         const Eigen::Vector2d terminalPos = positions.col(pieceNum);

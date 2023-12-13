@@ -44,12 +44,13 @@ namespace env
   public:
     OccMap() {}
     ~OccMap(){};
-    void init(const ros::NodeHandle &nh, const std::string &map_topic, const std::string &map_metadata_topic, const float &inflation_radius);
+    void init(const ros::NodeHandle &nh, const std::string &map_topic, const std::string &map_metadata_topic, const float &inflation_radius, const int &occ_threshold, std::string occ_map_topic);
 
     bool mapValid() { return is_global_map_valid_; }
     double getResolution() { return resolution_; }
     Eigen::Vector2d getOrigin() { return origin_; }
     Eigen::Vector2d getMapSize() { return map_size_; };
+    std::vector<bool> getOccupancyBuffer() { return occupancy_buffer_; }
     bool isStateValid(const Eigen::Vector2d &pos) const
     {
       Eigen::Vector2i idx = posToIndex(pos);
@@ -84,6 +85,16 @@ namespace env
       return true;
     }
 
+    bool checkIfMapUpdated()
+    {
+      if (todo_reset_rrt_tree)
+      {
+        todo_reset_rrt_tree = false;
+        return true;
+      }
+      return false;
+    }
+
     typedef shared_ptr<OccMap> Ptr;
 
   private:
@@ -112,26 +123,29 @@ namespace env
     ros::Subscriber global_map_metadata_sub_;
     ros::Timer global_occ_vis_timer_;
     ros::Publisher glb_occ_pub_;
+    ros::Publisher occ_map_pub_;
 
-    void setOccupancy(const Eigen::Vector2d &pos);
+    void setOccupancy(Eigen::Vector2i &id);
     void globalMapCallback(const nav_msgs::OccupancyGridPtr &msg);
     void globalMapMetadataCallback(const nav_msgs::MapMetaDataPtr &msg);
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr glb_cloud_ptr_;
     bool is_global_map_valid_;
     bool is_global_map_metadata_valid_;
+    bool todo_reset_rrt_tree;
 
     float inflation_radius_;
+    int occ_threshold_;
   };
 
   inline int OccMap::idxToAddress(const int &x_id, const int &y_id) const
   {
-    return x_id * grid_size_(1) + y_id;
+    return x_id + y_id * grid_size_(0);
   }
 
   inline int OccMap::idxToAddress(const Eigen::Vector2i &id) const
   {
-    return id(0) * grid_size_(1) + id(1);
+    return id(0)+ id(1) * grid_size_(0) ;
   }
 
   inline bool OccMap::isInMap(const Eigen::Vector2d &pos) const

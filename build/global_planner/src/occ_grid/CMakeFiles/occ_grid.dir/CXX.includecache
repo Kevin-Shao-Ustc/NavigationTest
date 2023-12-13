@@ -52,16 +52,6 @@ nav_msgs/OccupancyGrid.h
 nav_msgs/GetMap.h
 -
 
-/home/syy/NavigationTest/src/global_planner/src/occ_grid/src/raycast.cpp
-occ_grid/raycast.h
--
-iostream
--
-cmath
--
-Eigen/Eigen
--
-
 /opt/ros/noetic/include/geometry_msgs/Point.h
 string
 -

@@ -31,6 +31,7 @@ OF SUCH DAMAGE.
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <stdbool.h>
 #include "path_finder/kdtree.h"
 
 #if defined(WIN32) || defined(__WIN32__)
@@ -909,4 +910,65 @@ static void clear_results(struct kdres *rset)
     }
 
     rset->rlist->next = 0;
+}
+
+int delete_leaf_node(struct kdtree *tree, double *position, double tolerance, int max_depth)
+{
+    // find a leaf node with the coordinates x,y and delete it
+    struct kdnode *node = tree->root;
+    struct kdnode *parent = NULL;
+    int dir = 0;
+    int dim = tree->dim;
+    double *pos = NULL;
+    int depth = 0;
+
+    // find the leaf node
+    bool is_leaf = (node->left == 0) && (node->right == 0);
+    while (!is_leaf && depth < max_depth)
+    {
+        if (SQ(position[0] - node->pos[0]) + SQ(position[1] - node->pos[1]) < SQ(tolerance))
+        {
+            break;
+        }
+        parent = node;
+        dir = node->dir;
+        pos = node->pos;
+        if (position[dir] < node->pos[dir])
+        {
+            node = node->left;
+        }
+        else
+        {
+            node = node->right;
+        }
+        is_leaf = (node->left == 0) && (node->right == 0);
+        depth++;
+    }
+
+    // if we found a leaf node, delete it and free the memory
+    if (!is_leaf)
+    {
+        // fail to find a leaf node
+        return -1;
+    }
+    if (parent == NULL)
+    {
+        // in case root node is a leaf node, which is almost impossible
+        return -1;
+    }
+    else
+    {
+        if (parent->left == node)
+        {
+            // delete the left node
+            clear_rec(parent->left, tree->destr);
+            parent->left = NULL;
+        }
+        else
+        {
+            // delete the right node
+            clear_rec(parent->right, tree->destr);
+            parent->right = NULL;
+        }
+    }
 }

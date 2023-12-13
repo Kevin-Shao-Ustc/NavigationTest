@@ -118,6 +118,8 @@ void *kd_res_item2f(struct kdres *set, float *x, float *y);
 /* equivalent to kd_res_item(set, 0) */
 void *kd_res_item_data(struct kdres *set);
 
+/* delete the leaf node */
+int delete_leaf_node(struct kdtree *tree, double *position, double tolerance, int max_depth);
 
 #ifdef __cplusplus
 }

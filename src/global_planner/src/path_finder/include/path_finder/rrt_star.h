@@ -51,17 +51,11 @@ namespace path_plan
       ROS_WARN_STREAM("[RRT*] param: max_tree_node_nums: " << max_tree_node_nums_);
 
       valid_tree_node_nums_ = 0;
-      nodes_pool_.resize(max_tree_node_nums_);
-      for (int i = 0; i < max_tree_node_nums_; ++i)
-      {
-        nodes_pool_[i] = new TreeNode;
-      }
     }
     ~RRTStar(){};
 
-    bool plan(const Eigen::Vector2d &s, const Eigen::Vector2d &g)
+    bool plan(const Eigen::Vector2d &s, const Eigen::Vector2d &g, bool *todo_reset_rrt_tree)
     {
-      reset();
       if (!map_ptr_->isStateValid(s))
       {
         ROS_ERROR("[RRT*]: Start pos collide or out of bound");
@@ -72,17 +66,69 @@ namespace path_plan
         ROS_ERROR("[RRT*]: Goal pos collide or out of bound");
         return false;
       }
-      /* construct start and goal nodes */
-      start_node_ = nodes_pool_[1];
-      start_node_->x = s;
-      start_node_->cost_from_start = 0.0;
-      goal_node_ = nodes_pool_[0];
-      goal_node_->x = g;
-      goal_node_->cost_from_start = DBL_MAX; // important
-      valid_tree_node_nums_ = 2;             // put start and goal in tree
+      if (*todo_reset_rrt_tree)
+      {
+        reset();
+        /* construct start and goal nodes */
+        start_node_ = new TreeNode;
+        start_node_->x = s;
+        start_node_->cost_from_start = 0.0;
+        goal_node_ = new TreeNode;
+        goal_node_->x = g;
+        goal_node_->cost_from_start = DBL_MAX; // important
+        valid_tree_node_nums_ = 2;             // put start and goal in tree
+        goal_found = false;
+        /* kd tree init */
+        kd_tree = kd_create(2);
+        //Add start and goal nodes to kd tree
+        kd_insert2(kd_tree, start_node_->x[0], start_node_->x[1], start_node_);
+        *todo_reset_rrt_tree = false;
+      }
+      else
+      {
+        // update the goal node
+        goal_node_->x = g;
+        // if path not found, continue to search
+        // else, rewire the goal node first
+        if (goal_found)
+        {
+          // record the last cost
+          float best_cost_before_rewire = goal_node_->cost_from_start;
+          /* find parent for the new goal*/
+          vector<RRTNode2DPtr> neighbour_nodes;
+          std::vector<bool> is_valid_edge;
+          find_parent(goal_node_->x, goal_node_->parent, neighbour_nodes, is_valid_edge, goal_node_, true);
+          // check if a better path is generated after rewiring
+          float epsilon = 0.00001;
+          if (best_cost_before_rewire > goal_node_->cost_from_start + epsilon)
+          {
+            // update the best path
+            vector<Eigen::Vector2d> curr_best_path;
+            fillPath(goal_node_, curr_best_path);
+            path_list_.emplace_back(curr_best_path);
+            solution_cost_time_pair_list_.emplace_back(goal_node_->cost_from_start, 0);
+          }
+        }
+      }
 
-      ROS_INFO("[RRT*]: RRT starts planning a path");
-      return rrt_star(s, g);
+      // ROS_INFO("[RRT*]: RRT starts planning a path");
+      float time_cost = rrt_star(s, g);
+
+      if (goal_found)
+      {
+        final_path_use_time_ = time_cost;
+        fillPath(goal_node_, final_path_);
+        // ROS_INFO_STREAM("[RRT*]: first path length: " << solution_cost_time_pair_list_.front().first << ", use_time: " << first_path_use_time_);
+      }
+      else if (valid_tree_node_nums_ == max_tree_node_nums_)
+      {
+        ROS_ERROR_STREAM("[RRT*]: NOT CONNECTED TO GOAL after " << max_tree_node_nums_ << " nodes added to rrt-tree");
+      }
+      else
+      {
+        ROS_ERROR_STREAM("[RRT*]: NOT CONNECTED TO GOAL after " << time_cost << " seconds");
+      }
+      return goal_found;
     }
 
     vector<Eigen::Vector2d> getPath()
@@ -119,7 +165,7 @@ namespace path_plan
     double first_path_use_time_;
     double final_path_use_time_;
 
-    std::vector<TreeNode *> nodes_pool_;
+    std::map<float, RRTNode2DPtr> cost2node_map_;
     TreeNode *start_node_;
     TreeNode *goal_node_;
     vector<Eigen::Vector2d> final_path_;
@@ -131,17 +177,15 @@ namespace path_plan
     // std::shared_ptr<visualization::Visualization> vis_ptr_;
 
     bool isSamplerValid_ = false;
+    bool goal_found = false;
+
+    kdtree *kd_tree;
 
     void reset()
     {
       final_path_.clear();
       path_list_.clear();
       solution_cost_time_pair_list_.clear();
-      for (int i = 0; i < valid_tree_node_nums_; i++)
-      {
-        nodes_pool_[i]->parent = nullptr;
-        nodes_pool_[i]->children.clear();
-      }
       valid_tree_node_nums_ = 0;
     }
 
@@ -163,7 +207,8 @@ namespace path_plan
     RRTNode2DPtr addTreeNode(RRTNode2DPtr &parent, const Eigen::Vector2d &state,
                              const double &cost_from_start, const double &cost_from_parent)
     {
-      RRTNode2DPtr new_node_ptr = nodes_pool_[valid_tree_node_nums_];
+      RRTNode2DPtr new_node_ptr = new TreeNode;
+      cost2node_map_.insert(std::make_pair(cost_from_start, new_node_ptr));
       valid_tree_node_nums_++;
       new_node_ptr->parent = parent;
       parent->children.push_back(new_node_ptr);
@@ -211,19 +256,13 @@ namespace path_plan
       std::reverse(std::begin(path), std::end(path));
     }
 
-    bool rrt_star(const Eigen::Vector2d &s, const Eigen::Vector2d &g)
+    float rrt_star(const Eigen::Vector2d &s, const Eigen::Vector2d &g)
     {
       ros::Time rrt_start_time = ros::Time::now();
-      bool goal_found = false;
-
-      /* kd tree init */
-      kdtree *kd_tree = kd_create(2);
-      //Add start and goal nodes to kd tree
-      kd_insert2(kd_tree, start_node_->x[0], start_node_->x[1], start_node_);
 
       /* main loop */
       int idx = 0;
-      for (idx = 0; (ros::Time::now() - rrt_start_time).toSec() < search_time_ && valid_tree_node_nums_ < max_tree_node_nums_; ++idx)
+      for (idx = 0; (ros::Time::now() - rrt_start_time).toSec() < search_time_; ++idx)
       {
         /* biased random sampling */
         Eigen::Vector2d x_rand;
@@ -234,10 +273,6 @@ namespace path_plan
           isSamplerValid_ = true;
         }
         sampler_.samplingOnce(x_rand, goal_found, goal_node_->cost_from_start, start_node_->x, goal_node_->x);
-        if (idx % 100 == 0)
-        {
-          // ROS_INFO_STREAM("[RRT*]: " << idx << " nodes added to rrt-tree, " << (ros::Time::now() - rrt_start_time).toSec() << " seconds elapsed");
-        }
         // samplingOnce(x_rand);
         if (!map_ptr_->isStateValid(x_rand))
         {
@@ -258,70 +293,11 @@ namespace path_plan
         {
           continue;
         }
-
         /* 1. find parent */
-        /* kd_tree bounds search for parent */
         vector<RRTNode2DPtr> neighbour_nodes;
-        struct kdres *nbr_set;
-        nbr_set = kd_nearest_range2(kd_tree, x_new[0], x_new[1], search_radius_);
-        if (nbr_set == nullptr)
-        {
-          ROS_ERROR("bkwd kd range query error");
-          break;
-        }
-        while (!kd_res_end(nbr_set))
-        {
-          RRTNode2DPtr curr_node = (RRTNode2DPtr)kd_res_item_data(nbr_set);
-          neighbour_nodes.emplace_back(curr_node);
-          // store range query result so that we dont need to query again for rewire;
-          kd_res_next(nbr_set); //go to next in kd tree range query result
-        }
-        kd_res_free(nbr_set); //reset kd tree range query
-
-        /* choose parent from kd tree range query result*/
-        double dist2nearest = calDist(nearest_node->x, x_new);
-        double min_dist_from_start(nearest_node->cost_from_start + dist2nearest);
-        double cost_from_p(dist2nearest);
-        RRTNode2DPtr min_node(nearest_node); //set the nearest_node as the default parent
-
-        // TODO: Choose a parent according to potential cost-from-start values
-        // ! Hints:
-        // !  1. Use map_ptr_->isSegmentValid(p1, p2) to check line edge validity;
-        // !  2. Default parent is [nearest_node];
-        // !  3. Store your chosen parent-node-pointer, the according cost-from-parent and cost-from-start
-        // !     in [min_node], [cost_from_p], and [min_dist_from_start], respectively;
-        // !  4. [Optional] You can sort the potential parents first in increasing order by cost-from-start value;
-        // !  5. [Optional] You can store the collison-checking results for later usage in the Rewire procedure.
-        // ! Implement your own code inside the following loop
-
-        // store the collision-checking results for later usage in the Rewire procedure.
-        std::vector<bool> is_valid_edge(neighbour_nodes.size(), false);
-        for (auto &curr_node : neighbour_nodes)
-        {
-          // check if the edge is valid
-          if (!map_ptr_->isSegmentValid(curr_node->x, x_new)) continue;
-          // if valid, update the cost_from_start and check if it is the better parent
-          is_valid_edge.push_back(true);
-          double dist2curr = calDist(curr_node->x, x_new);
-          double cost_from_curr = curr_node->cost_from_start + dist2curr;
-          if (cost_from_curr < min_dist_from_start)
-          {
-            // update the parent
-            min_dist_from_start = cost_from_curr;
-            cost_from_p = dist2curr;
-            min_node = curr_node;
-          }
-        }
-        // ! Implement your own code inside the above loop
-
-        /* parent found within radius, then add a node to rrt and kd_tree */
-        /* 1.1 add the randomly sampled node to rrt_tree */
+        std::vector<bool> is_valid_edge;
         RRTNode2DPtr new_node(nullptr);
-        new_node = addTreeNode(min_node, x_new, min_dist_from_start, cost_from_p);
-
-        /* 1.2 add the randomly sampled node to kd_tree */
-        kd_insert2(kd_tree, x_new[0], x_new[1], new_node);
-        // end of find parent
+        find_parent(x_new, nearest_node, neighbour_nodes, is_valid_edge, new_node, false);
 
         /* 2. try to connect to goal if possible */
         double dist_to_goal = calDist(x_new, goal_node_->x);
@@ -344,44 +320,8 @@ namespace path_plan
             solution_cost_time_pair_list_.emplace_back(goal_node_->cost_from_start, (ros::Time::now() - rrt_start_time).toSec());
           }
         }
-
-        /* 3.rewire */
-        // TODO: Rewire according to potential cost-from-start values
-        // ! Hints:
-        // !  1. Use map_ptr_->isSegmentValid(p1, p2) to check line edge validity;
-        // !  2. Use changeNodeParent(node, parent, cost_from_parent) to change a node's parent;
-        // !  3. the variable [new_node] is the pointer of X_new;
-        // !  4. [Optional] You can test whether the node is promising before checking edge collison.
-        // ! Implement your own code between the dash lines [--------------] in the following loop
-        auto curr_node = neighbour_nodes.begin();
-        auto is_valid_edge_ptr = is_valid_edge.begin();
-        while(curr_node != neighbour_nodes.end() && is_valid_edge != is_valid_edge)
-        {
-          // check if the edge is valid
-          if (!(*is_valid_edge_ptr))  continue;
-          // if valid, update the cost_from_start and check if it is the better parent
-          double dist2curr = calDist((*curr_node)->x, x_new);
-          double cost_from_curr = new_node->cost_from_start + dist2curr;
-          if (cost_from_curr < (*curr_node)->cost_from_start)
-          {
-            // record the best cost before rewire
-            double best_cost_before_rewire = goal_node_->cost_from_start;
-            // update the parent
-            changeNodeParent(*curr_node, new_node, dist2curr);
-            // check if a better path is generated after rewiring
-            if (best_cost_before_rewire > goal_node_->cost_from_start)
-            {
-              // update the best path
-              vector<Eigen::Vector2d> curr_best_path;
-              fillPath(goal_node_, curr_best_path);
-              path_list_.emplace_back(curr_best_path);
-              solution_cost_time_pair_list_.emplace_back(goal_node_->cost_from_start, (ros::Time::now() - rrt_start_time).toSec());
-            }
-          }
-          ++curr_node;
-          ++is_valid_edge_ptr;
-        }
-        /* end of rewire */
+        /* 3. rewire */
+        rewire(x_new, neighbour_nodes, is_valid_edge, new_node, (ros::Time::now() - rrt_start_time).toSec());
       }
       /* end of sample once */
 
@@ -399,22 +339,7 @@ namespace path_plan
       // }
       // vis_ptr_->visualize_balls(balls, "tree_vertice", visualization::Color::blue, 1.0);
       // vis_ptr_->visualize_pairline(edges, "tree_edges", visualization::Color::red, 0.04);
-
-      if (goal_found)
-      {
-        final_path_use_time_ = (ros::Time::now() - rrt_start_time).toSec();
-        fillPath(goal_node_, final_path_);
-        ROS_INFO_STREAM("[RRT*]: first path length: " << solution_cost_time_pair_list_.front().first << ", use_time: " << first_path_use_time_);
-      }
-      else if (valid_tree_node_nums_ == max_tree_node_nums_)
-      {
-        ROS_ERROR_STREAM("[RRT*]: NOT CONNECTED TO GOAL after " << max_tree_node_nums_ << " nodes added to rrt-tree");
-      }
-      else
-      {
-        ROS_ERROR_STREAM("[RRT*]: NOT CONNECTED TO GOAL after " << (ros::Time::now() - rrt_start_time).toSec() << " seconds");
-      }
-      return goal_found;
+      return (ros::Time::now() - rrt_start_time).toSec();
     }
 
     void sampleWholeTree(const RRTNode2DPtr &root, vector<Eigen::Vector2d> &vertice, vector<std::pair<Eigen::Vector2d, Eigen::Vector2d>> &edges)
@@ -437,6 +362,150 @@ namespace path_plan
           Q.push(leafptr);
         }
       }
+    }
+  
+    void find_parent(Eigen::Vector2d &x_new, RRTNode2DPtr &nearest_node, std::vector<RRTNode2DPtr> &neighbour_nodes, std::vector<bool> &is_valid_edge, RRTNode2DPtr &new_node, bool is_goal)
+    {
+      // find parent
+      struct kdres *nbr_set;
+      nbr_set = kd_nearest_range2(kd_tree, x_new[0], x_new[1], search_radius_);
+      if (nbr_set == nullptr)
+      {
+        ROS_ERROR("bkwd kd range query error");
+        return;
+      }
+      while (!kd_res_end(nbr_set))
+      {
+        RRTNode2DPtr curr_node = (RRTNode2DPtr)kd_res_item_data(nbr_set);
+        neighbour_nodes.emplace_back(curr_node);
+        // store range query result so that we dont need to query again for rewire;
+        kd_res_next(nbr_set); //go to next in kd tree range query result
+      }
+      kd_res_free(nbr_set); //reset kd tree range query
+
+      // choose parent from kd tree range query result
+      double dist2nearest = calDist(nearest_node->x, x_new);
+      double min_dist_from_start(nearest_node->cost_from_start + dist2nearest);
+      double cost_from_p(dist2nearest);
+      RRTNode2DPtr min_node(nearest_node); //set the nearest_node as the default parent
+
+      // TODO: Choose a parent according to potential cost-from-start values
+      // ! Hints:
+      // !  1. Use map_ptr_->isSegmentValid(p1, p2) to check line edge validity;
+      // !  2. Default parent is [nearest_node];
+      // !  3. Store your chosen parent-node-pointer, the according cost-from-parent and cost-from-start
+      // !     in [min_node], [cost_from_p], and [min_dist_from_start], respectively;
+      // !  4. [Optional] You can sort the potential parents first in increasing order by cost-from-start value;
+      // !  5. [Optional] You can store the collison-checking results for later usage in the Rewire procedure.
+      // ! Implement your own code inside the following loop
+
+      // store the collision-checking results for later usage in the Rewire procedure.
+      for (auto &curr_node : neighbour_nodes)
+      {
+        // check if the edge is valid
+        if (!map_ptr_->isSegmentValid(curr_node->x, x_new)) continue;
+        // if valid, update the cost_from_start and check if it is the better parent
+        is_valid_edge.push_back(true);
+        double dist2curr = calDist(curr_node->x, x_new);
+        double cost_from_curr = curr_node->cost_from_start + dist2curr;
+        if (cost_from_curr < min_dist_from_start)
+        {
+          // update the parent
+          min_dist_from_start = cost_from_curr;
+          cost_from_p = dist2curr;
+          min_node = curr_node;
+        }
+      }
+
+      // ! Implement your own code inside the above loop
+
+      /* parent found within radius, then add a node to rrt and kd_tree */
+      /* 1.1 add the randomly sampled node to rrt_tree */
+      if (is_goal)
+      {
+        // if the new_node is the goal, update the goal node's parent
+        changeNodeParent(goal_node_, min_node, cost_from_p);
+        goal_found = true;
+      }
+      else
+      {
+        if (valid_tree_node_nums_ < max_tree_node_nums_)
+        {
+          new_node = addTreeNode(min_node, x_new, min_dist_from_start, cost_from_p);
+        }
+        else
+        {
+          // delete a node that is not in the best path and has the largest cost_from_start
+          RRTNode2DPtr node_to_delete = cost2node_map_.rbegin()->second;
+          // check if the node is in the best path
+          bool is_in_best_path = false;
+          for (auto &path : path_list_)
+          {
+            for (auto &node : path)
+            {
+              if (node == node_to_delete->x)
+              {
+                is_in_best_path = true;
+                break;
+              }
+            }
+            if (is_in_best_path) break;
+          }
+          // if not in the best path, erase it
+          node_to_delete->parent->children.remove(node_to_delete);
+          cost2node_map_.erase(cost2node_map_.rbegin()->first);
+          delete_leaf_node(kd_tree, node_to_delete->x.data(), 0.0001, max_tree_node_nums_);
+          // remove the point from the kd tree
+          delete node_to_delete;
+          valid_tree_node_nums_--;
+          // add the new node
+          new_node = addTreeNode(min_node, x_new, min_dist_from_start, cost_from_p);
+        }
+        /* 1.2 add the randomly sampled node to kd_tree */
+        kd_insert2(kd_tree, x_new[0], x_new[1], new_node);
+      }
+      // end of find parent
+    }
+
+    void rewire(const Eigen::Vector2d &x_new, vector<RRTNode2DPtr> &neighbour_nodes, const vector<bool> &is_valid_edge, RRTNode2DPtr &new_node, float time_cost)
+    {
+      /* 3.rewire */
+      // TODO: Rewire according to potential cost-from-start values
+      // ! Hints:
+      // !  1. Use map_ptr_->isSegmentValid(p1, p2) to check line edge validity;
+      // !  2. Use changeNodeParent(node, parent, cost_from_parent) to change a node's parent;
+      // !  3. the variable [new_node] is the pointer of X_new;
+      // !  4. [Optional] You can test whether the node is promising before checking edge collison.
+      // ! Implement your own code between the dash lines [--------------] in the following loop
+      auto curr_node = neighbour_nodes.begin();
+      auto is_valid_edge_ptr = is_valid_edge.begin();
+      while(curr_node != neighbour_nodes.end() && is_valid_edge != is_valid_edge)
+      {
+        // check if the edge is valid
+        if (!(*is_valid_edge_ptr))  continue;
+        // if valid, update the cost_from_start and check if it is the better parent
+        double dist2curr = calDist((*curr_node)->x, x_new);
+        double cost_from_curr = new_node->cost_from_start + dist2curr;
+        if (cost_from_curr < (*curr_node)->cost_from_start)
+        {
+          // record the best cost before rewire
+          double best_cost_before_rewire = goal_node_->cost_from_start;
+          // update the parent
+          changeNodeParent(*curr_node, new_node, dist2curr);
+          // check if a better path is generated after rewiring
+          if (best_cost_before_rewire > goal_node_->cost_from_start)
+          {
+            // update the best path
+            vector<Eigen::Vector2d> curr_best_path;
+            fillPath(goal_node_, curr_best_path);
+            path_list_.emplace_back(curr_best_path);
+            solution_cost_time_pair_list_.emplace_back(goal_node_->cost_from_start, time_cost);
+          }
+        }
+        ++curr_node;
+        ++is_valid_edge_ptr;
+      }
+      /* end of rewire */
     }
   };
 
